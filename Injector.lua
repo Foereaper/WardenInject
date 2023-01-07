@@ -108,12 +108,12 @@ local function SendAddonInjector(player)
 	-- Concatenate
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.c = function(a) local b='' for _,d in ipairs(a) do b=b..d end; return b end", 7, player) 
 	-- Execute
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.e = function(n) local t=_G['"..cGTN.."']; local lt = t.s[n] local fn = t.f.c(lt.ca); local p, v = GetCVar(n..'Payload'), GetCVar(n..'Version') if(v) then SetCVar(n..'Version', lt.v) else RegisterCVar(n..'Version', tostring(lt.v)) end if(p) then SetCVar(n..'Payload', fn) else RegisterCVar(n..'Payload', fn) end; if(lt.co==1) then fn = lualzw.decompress(fn) end t.f.l(fn, n) t.s[n]=nil end", 7, player)
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.e = function(n) local t=_G['"..cGTN.."']; local lt = t.s[n] local fn = t.f.c(lt.ca); _G[n..'payload'] = {v = lt.v, p = fn}; if(lt.co==1) then fn = lualzw.decompress(fn) end t.f.l(fn, n) t.s[n]=nil end", 7, player)
 	-- Process
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.p = function(a, b, n, v, c, co, s) local t,tc=_G['"..cGTN.."'], _G['"..cGTN.."'].s; if not tc[n] then tc[n] = {['v']=v, ['co']=co, ['c']=c, ['ca']={}} end local lt = tc[n] a=tonumber(a) b=tonumber(b) table.insert(lt.ca, a, s) if a == b and #lt.ca == b then t.f.e(n) end end", 7, player)
 	-- Inform
 	-- One potential issue is dependencies, this is something I'll have to look into at some point..
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co) t=_G['"..cGTN.."']; if(c == 1) then local cv = tonumber(GetCVar(n..'Version')) if(cv and cv == v) then local p = GetCVar(n..'Payload') if(p) then if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co) t=_G['"..cGTN.."']; RegisterForSave(n..'payload'); if(c == 1) then local cc = _G[n..'payload'] if(cc)  then if(cc.v == v) then local p = cc.p if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
 	
 	-- Sends an inform to the player about the available payloads
 	SendPayloadInform(player)
