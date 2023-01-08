@@ -154,7 +154,6 @@ local function OnAddonMessageReceived(event, player, _type, header, data, target
 			elseif(data == "kill") then
 				-- kill the initial loader, this is to prevent spoofed addon packets with access to the protected namespace
 				-- the initial injector can not be used after this point, and the injected helper functions above are the ones that need to be used.
-				print("received kill request")
 				player:SendAddonMessage("ws", "false", 7, player)
 
 				-- if the below is printed in your chat, then the initial injector was not disabled and you have problems to debug :)
