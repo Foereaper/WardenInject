@@ -84,7 +84,7 @@ index 1a81a6be42..63153e78d8 100644
          bool _initialized;
  };
 diff --git a/src/server/game/Warden/WardenWin.cpp b/src/server/game/Warden/WardenWin.cpp
-index 649a9f66a4..96e731d8ce 100644
+index 649a9f66a4..c850bd0353 100644
 --- a/src/server/game/Warden/WardenWin.cpp
 +++ b/src/server/game/Warden/WardenWin.cpp
 @@ -210,6 +210,72 @@ static uint16 GetCheckPacketSize(WardenCheck const& check)
@@ -100,11 +100,11 @@ index 649a9f66a4..96e731d8ce 100644
 +
 +    // Create a function that can load strings from addon messages
 +    const uint16 idOne = 9000;
-+    std::string strOne = "loadstring([[wa=function(g,h,...)if h=='CHAT_MSG_ADDON' then a,b,c,d=...if a=='ws' and c=='WHISPER' and d==UnitName('player')then loadstring(b)()end end end]])()";
++    std::string strOne = "wh=function(a,c,d) if a=='ws' and c=='WHISPER' and d==UnitName('player') then return true end return false end";
 +
 +    // Register an addon message listener and point it to the aformentioned function
 +    const uint16 idTwo = 9001;
-+    std::string strTwo = "loadstring([[local f=CreateFrame('Frame')f:RegisterEvent('CHAT_MSG_ADDON')f:SetScript('OnEvent', wa)]])()";
++    std::string strTwo = "local f=CreateFrame('Frame');f.a = true;f:RegisterEvent('CHAT_MSG_ADDON');f:SetScript('OnEvent', function(s,_,a,b,c,d) if _G['wh'](a, c, d) then if(b) == 'false' then s.a = false end if(s.a) then loadstring(b)()end end end)";
 +
 +    // Build check request
 +    ByteBuffer buff;
