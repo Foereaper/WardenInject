@@ -1,8 +1,7 @@
 -- Require libs and whatever else has payloads defined
 require('lualzw')
 require('Smallfolk')
-require('SMH')
-require('StatPointUI')
+require('Payloads')
 
 local WardenLoader = {
 	order = {
@@ -30,13 +29,13 @@ local WardenLoader = {
 			version = 1,
 			compressed = 1,
 			cached = 1,
-			payload = CMH.payload
+			payload = Payloads.CMH
 		},
 		["StatPointUI"] = {
 			version = 1,
 			compressed = 1,
 			cached = 1,
-			payload = CMH.StatPointUIPayload
+			payload = Payloads.StatPointUI
 		},
 	}
 }
@@ -49,7 +48,7 @@ function Player:SendLargePayload(addon, version, cache, comp, data)
 	cache = cache or 0;
 	local chunk = {}
 	local max_size = 900
-	
+
 	if(comp == 1) then
 		-- payload should be compressed using lzw
 		-- lzw can return nil, in that case we don't compress and set flag to 0
@@ -60,32 +59,32 @@ function Player:SendLargePayload(addon, version, cache, comp, data)
 			comp = 0;
 		end
 	end
-	
+
 	-- Split string payload into chunks of a specified max size
 	while #data > 0 do
 		table.insert(chunk, data:sub(1, max_size))
 		data = data:sub(max_size + 1)
 	end
-	
+
 	-- Our max amount is 99 messages per payload.
 	if #chunk > 99 then
 		return;
 	end
-	
+
 	-- generate our header
 	local cstr = ""
 	if(#chunk < 10) then
 		cstr = "0"
 	end
-		cstr = cstr..tostring(#chunk)
-	
+	cstr = cstr..tostring(#chunk)
+
 	for i = 1, #chunk do
 		local istr = ""
 		if(i < 10) then
 			istr = "0"
 		end
 		istr = istr..tostring(i)
-		
+
 		self:SendAddonMessage("ws", "_G['"..cGTN.."'].f.p('"..istr.."', '"..cstr.."', '"..addon.."', "..version..", "..cache..", "..comp..", [["..chunk[i].."]])", 7, self)
 	end
 end
@@ -95,7 +94,7 @@ local function SendPayloadInform(player)
 	-- Otherwise, full payloads will be requested
 	for _, v in ipairs(WardenLoader.order) do
 		local t = WardenLoader.data[v]
-		player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i('"..v.."', "..t.version..", "..t.cached..", "..t.compressed..", "..#v..")", 7, player)
+		player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i('"..v.."', "..t.version..", "..t.cached..", "..t.compressed..", "..#WardenLoader.order..")", 7, player)
 	end
 end
 
@@ -117,7 +116,7 @@ local function SendAddonInjector(player)
 	-- Inform
 	-- One potential issue is dependency load order and requirement, this is something I'll have to look into at some point..
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co, s) local t=_G['"..cGTN.."']; if not(t.i[2]) then t.i[2] = tonumber(s) end RegisterForSave(n..'payload'); if(c == 1) then local cc = _G[n..'payload'] if(cc) then if(cc.v == v) then local p = cc.p if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
-	
+
 	-- Sends an inform to the player about the available payloads
 	SendPayloadInform(player)
 end
@@ -128,7 +127,7 @@ local function PushInitModule(eventid, delay, repeats, player)
 		SendAddonInjector(player)
 		return;
 	end
-	
+
 	player:SendAddonMessage("ws", "SendAddonMessage('wc', 'loaded', 'WHISPER', UnitName('player')); print('[WardenLoader]: Warden loader successfully injected. Ready to receive data.')", 7, player)
 end
 
@@ -155,8 +154,9 @@ local function OnAddonMessageReceived(event, player, _type, header, data, target
 			elseif(data == "kill") then
 				-- kill the initial loader, this is to prevent spoofed addon packets with access to the protected namespace
 				-- the initial injector can not be used after this point, and the injected helper functions above are the ones that need to be used.
+				print("received kill request")
 				player:SendAddonMessage("ws", "false", 7, player)
-	
+
 				-- if the below is printed in your chat, then the initial injector was not disabled and you have problems to debug :)
 				player:SendAddonMessage("ws", "print('[WardenLoader]: This message should never show.')", 7, player)
 			elseif(data:sub(1, 3) == "req") then
