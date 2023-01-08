@@ -95,7 +95,7 @@ local function SendPayloadInform(player)
 	-- Otherwise, full payloads will be requested
 	for _, v in ipairs(WardenLoader.order) do
 		local t = WardenLoader.data[v]
-		player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i('"..v.."', "..t.version..", "..t.cached..", "..t.compressed..")", 7, player)
+		player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i('"..v.."', "..t.version..", "..t.cached..", "..t.compressed..", "..#v..")", 7, player)
 	end
 end
 
@@ -105,9 +105,9 @@ local function SendAddonInjector(player)
 	player:SendAddonMessage("ws", "SlashCmdList['RELOAD'] = function() _G['ReloadUI']() end", 7, player)
 
 	-- Generate helper functions to load larger datasets
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'] = {}; _G['"..cGTN.."'].f = {}; _G['"..cGTN.."'].s = {};", 7, player)
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'] = {}; _G['"..cGTN.."'].f = {}; _G['"..cGTN.."'].s = {}; _G['"..cGTN.."'].i = {0};", 7, player)
 	-- Load
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.l = function(s, n) forceinsecure() loadstring(s)() print('[WardenLoader]: '..n..' loaded!') end", 7, player) 
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.l = function(s, n) local t=_G['"..cGTN.."'].i; forceinsecure(); loadstring(s)(); print('[WardenLoader]: '..n..' loaded!') t[1] = t[1]+1; if(t[1] == t[2]) then SendAddonMessage('wc', 'kill', 'WHISPER', UnitName('player')) end end", 7, player) 
 	-- Concatenate
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.c = function(a) local b='' for _,d in ipairs(a) do b=b..d end; return b end", 7, player) 
 	-- Execute
@@ -116,17 +116,10 @@ local function SendAddonInjector(player)
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.p = function(a, b, n, v, c, co, s) local t,tc=_G['"..cGTN.."'], _G['"..cGTN.."'].s; if not tc[n] then tc[n] = {['v']=v, ['co']=co, ['c']=c, ['ca']={}} end local lt = tc[n] a=tonumber(a) b=tonumber(b) table.insert(lt.ca, a, s) if a == b and #lt.ca == b then t.f.e(n) end end", 7, player)
 	-- Inform
 	-- One potential issue is dependency load order and requirement, this is something I'll have to look into at some point..
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co) t=_G['"..cGTN.."']; RegisterForSave(n..'payload'); if(c == 1) then local cc = _G[n..'payload'] if(cc) then if(cc.v == v) then local p = cc.p if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co, s) local t=_G['"..cGTN.."']; if not(t.i[2]) then t.i[2] = tonumber(s) end RegisterForSave(n..'payload'); if(c == 1) then local cc = _G[n..'payload'] if(cc) then if(cc.v == v) then local p = cc.p if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
 	
 	-- Sends an inform to the player about the available payloads
 	SendPayloadInform(player)
-	
-	-- kill the initial loader, this is to prevent spoofed addon packets with access to the protected namespace
-	-- the initial injector can not be used after this point, and the injected helper functions above are the ones that need to be used.
-	player:SendAddonMessage("ws", "false", 7, player)
-	
-	-- if the below is printed in your chat, then the initial injector was not disabled and you have problems to debug :)
-	player:SendAddonMessage("ws", "print('[WardenLoader]: This message should never show.')", 7, player)
 end
 
 local function PushInitModule(eventid, delay, repeats, player)
@@ -159,6 +152,13 @@ local function OnAddonMessageReceived(event, player, _type, header, data, target
 			elseif(data == "loaded") then
 				-- module is loaded and ready to receive data
 				player:SetData("ModuleInit", true)
+			elseif(data == "kill") then
+				-- kill the initial loader, this is to prevent spoofed addon packets with access to the protected namespace
+				-- the initial injector can not be used after this point, and the injected helper functions above are the ones that need to be used.
+				player:SendAddonMessage("ws", "false", 7, player)
+	
+				-- if the below is printed in your chat, then the initial injector was not disabled and you have problems to debug :)
+				player:SendAddonMessage("ws", "print('[WardenLoader]: This message should never show.')", 7, player)
 			elseif(data:sub(1, 3) == "req") then
 				local addon = data:gsub(data:sub(1, 3),'')
 				local t = WardenLoader.data[addon]
