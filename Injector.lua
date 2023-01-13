@@ -3,45 +3,83 @@ require('lualzw')
 require('Smallfolk')
 require('Payloads')
 
+-- Name of the global table storing the injected functionality
+local cGTN = "wi"
+
+local dbg = "false"
+
 local WardenLoader = {
 	order = {
 		-- defines the load order of payloads
 		[1] = "lualzw",
 		[2] = "Smallfolk",
-		[3] = "CMH",
-		[4] = "StatPointUI",
+		[3] = "Queue",
+		[4] = "LibStub",
+		[5] = "LibWindow",
+		[6] = "CMH",
+		[7] = "StatPointUI",
+		[8] = "AIO",
 	},
 	data = {
 		-- defines data per payload
 		["lualzw"] = {
 			version = 1,
-			compressed = 0,
+			compressed = 0, -- This is the compression library, so can't be compressed
 			cached = 1,
-			payload = lualzw.payload
+			payload = lualzw.payload,
+			savedVars = {},
 		},
 		["Smallfolk"] = {
 			version = 1,
 			compressed = 1,
 			cached = 1,
-			payload = Smallfolk.payload
+			payload = Smallfolk.payload,
+			savedVars = {}
+		},
+		["Queue"] = {
+			version = 1,
+			compressed = 1,
+			cached = 1,
+			payload = Payloads.Queue,
+			savedVars = {}
+		},
+		["LibStub"] = {
+			version = 1,
+			compressed = 1,
+			cached = 1,
+			payload = Payloads.LibStub,
+			savedVars = {}
+		},
+		["LibWindow"] = {
+			version = 1,
+			compressed = 1,
+			cached = 1,
+			payload = Payloads.LibWindow,
+			savedVars = {}
 		},
 		["CMH"] = {
 			version = 1,
 			compressed = 1,
 			cached = 1,
-			payload = Payloads.CMH
+			payload = Payloads.CMH,
+			savedVars = {}
 		},
 		["StatPointUI"] = {
 			version = 1,
 			compressed = 1,
 			cached = 1,
-			payload = Payloads.StatPointUI
+			payload = Payloads.StatPointUI,
+			savedVars = {}
 		},
+		["AIO"] = {
+			version = 1,
+			compressed = 1,
+			cached = 1,
+			payload = Payloads.AIO,
+			savedVars = {"AIO_sv", "AIO_sv_Addons"}
+		}, 
 	}
 }
-
--- Name of the global table storing the injected functionality
-local cGTN = "wi"
 
 function Player:SendLargePayload(addon, version, cache, comp, data)
 	comp = comp or 0;
@@ -94,6 +132,11 @@ local function SendPayloadInform(player)
 	-- Otherwise, full payloads will be requested
 	for _, v in ipairs(WardenLoader.order) do
 		local t = WardenLoader.data[v]
+		-- register all saved variables if there are any
+		for _, var in pairs(t.savedVars) do
+			player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.r('"..var.."')", 7, player)
+		end
+		
 		player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i('"..v.."', "..t.version..", "..t.cached..", "..t.compressed..", "..#WardenLoader.order..")", 7, player)
 	end
 end
@@ -104,9 +147,9 @@ local function SendAddonInjector(player)
 	player:SendAddonMessage("ws", "SlashCmdList['RELOAD'] = function() _G['ReloadUI']() end", 7, player)
 
 	-- Generate helper functions to load larger datasets
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'] = {}; _G['"..cGTN.."'].f = {}; _G['"..cGTN.."'].s = {}; _G['"..cGTN.."'].i = {0};", 7, player)
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'] = { f = {}, s = {}, i = {0}, d = "..dbg.."};", 7, player)
 	-- Load
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.l = function(s, n) local t=_G['"..cGTN.."'].i; forceinsecure(); loadstring(s)(); print('[WardenLoader]: '..n..' loaded!') t[1] = t[1]+1; if(t[1] == t[2]) then SendAddonMessage('wc', 'kill', 'WHISPER', UnitName('player')) end end", 7, player) 
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.l = function(s, n) local t=_G['"..cGTN.."'].i; forceinsecure(); loadstring(s)(); if(t.d) then print('[WardenLoader]: '..n..' loaded!') end t[1] = t[1]+1; if(t[1] == t[2]) then SendAddonMessage('wc', 'kill', 'WHISPER', UnitName('player')) end end", 7, player) 
 	-- Concatenate
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.c = function(a) local b='' for _,d in ipairs(a) do b=b..d end; return b end", 7, player) 
 	-- Execute
@@ -115,7 +158,9 @@ local function SendAddonInjector(player)
 	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.p = function(a, b, n, v, c, co, s) local t,tc=_G['"..cGTN.."'], _G['"..cGTN.."'].s; if not tc[n] then tc[n] = {['v']=v, ['co']=co, ['c']=c, ['ca']={}} end local lt = tc[n] a=tonumber(a) b=tonumber(b) table.insert(lt.ca, a, s) if a == b and #lt.ca == b then t.f.e(n) end end", 7, player)
 	-- Inform
 	-- One potential issue is dependency load order and requirement, this is something I'll have to look into at some point..
-	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co, s) local t=_G['"..cGTN.."']; if not(t.i[2]) then t.i[2] = tonumber(s) end RegisterForSave(n..'payload'); if(c == 1) then local cc = _G[n..'payload'] if(cc) then if(cc.v == v) then local p = cc.p if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.i = function(n, v, c, co, s) local t=_G['"..cGTN.."']; if not(t.i[2]) then t.i[2] = tonumber(s) end if(c == 1) then RegisterForSave(n..'payload'); local cc = _G[n..'payload'] if(cc) then if(cc.v == v) then local p = cc.p if(co == 1) then p = lualzw.decompress(p) end t.f.l(p, n) return; end end end SendAddonMessage('wc', 'req'..n, 'WHISPER', UnitName('player')) end", 7, player)
+	-- cache registry
+	player:SendAddonMessage("ws", "_G['"..cGTN.."'].f.r = function(a) RegisterForSave(a); end", 7, player) 
 
 	-- Sends an inform to the player about the available payloads
 	SendPayloadInform(player)
@@ -128,7 +173,7 @@ local function PushInitModule(eventid, delay, repeats, player)
 		return;
 	end
 
-	player:SendAddonMessage("ws", "SendAddonMessage('wc', 'loaded', 'WHISPER', UnitName('player')); print('[WardenLoader]: Warden loader successfully injected. Ready to receive data.')", 7, player)
+	player:SendAddonMessage("ws", "SendAddonMessage('wc', 'loaded', 'WHISPER', UnitName('player')); print('[WardenLoader]: Injection successful.')", 7, player)
 end
 
 local function AwaitInjection(event, player)
@@ -136,7 +181,7 @@ local function AwaitInjection(event, player)
 	-- If so, it will not work, so we should set the warden packet as queued "just in case"
 	-- This has no impact if the warden packet has not yet been sent, so eh.
 	player:QueueWardenPayload()
-	player:SendBroadcastMessage("[WardenLoader]: Waiting for Warden injection...")
+	player:SendBroadcastMessage("[WardenLoader]: Awaiting injection...")
 	-- Register timed event to try and push data to the client.
 	player:SetData("ModuleInit", false)
 	player:RegisterEvent(PushInitModule, 1000, 0)
@@ -152,6 +197,7 @@ local function OnAddonMessageReceived(event, player, _type, header, data, target
 				-- module is loaded and ready to receive data
 				player:SetData("ModuleInit", true)
 			elseif(data == "kill") then
+				print("received kill command")
 				-- kill the initial loader, this is to prevent spoofed addon packets with access to the protected namespace
 				-- the initial injector can not be used after this point, and the injected helper functions above are the ones that need to be used.
 				player:SendAddonMessage("ws", "false", 7, player)
